@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Chama Bebidas Cliente",
-    "slug": "chama-bebidas-cliente",
-    "version": "1.0.0",
+    "name": "Chama Bebidas",
+    "slug": "chama-cliente-v3",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./icon.png",
     "userInterfaceStyle": "dark",
@@ -13,15 +13,13 @@
     },
     "android": {
       "package": "com.chamabebidas.cliente",
-      "versionCode": 1,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./adaptive-icon.png",
         "backgroundColor": "#08090C"
       },
       "permissions": [
-        "INTERNET",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "INTERNET"
       ]
     }
   }

@@ -1,3 +1,3 @@
-# Chama Bebidas Cliente
+# Chama Bebidas Cliente V3
 
-App cliente pronto para Codemagic.
+App cliente premium pronto para Codemagic.
