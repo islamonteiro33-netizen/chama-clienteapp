@@ -1,3 +1,3 @@
-# Chama Bebidas Cliente V3
+# Chama Adega V9.1 Menu
 
-App cliente premium pronto para Codemagic.
+Rodapé com 3 opções grandes e menu lateral premium.
