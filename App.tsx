@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, SafeAreaView, ScrollView, StatusBar as RNStatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Linking, SafeAreaView, ScrollView, StatusBar as RNStatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
+import * as ImagePicker from 'expo-image-picker';
 
 const API = 'https://chamabebidas.com.br/api';
 const C = {
@@ -20,7 +21,7 @@ const C = {
   orange: '#F97316',
 };
 
-type Screen = 'login' | 'home' | 'store' | 'cart' | 'checkout' | 'tracking' | 'profile' | 'menuPage';
+type Screen = 'login' | 'register' | 'home' | 'store' | 'cart' | 'checkout' | 'tracking' | 'profile' | 'menuPage';
 type Store = { id: any; name?: string; store_name?: string; address?: string; rating?: number; delivery_time?: string; delivery_fee?: number };
 type Product = { id: any; name?: string; title?: string; product_name?: string; price?: number; category?: string; offer?: boolean };
 
@@ -41,8 +42,12 @@ const CATS = [['🍺','Cervejas'], ['🍷','Vinhos'], ['🥃','Destilados'], ['�
 export default function App() {
   const [screen, setScreen] = useState<Screen>('login');
   const [name, setName] = useState('');
+  const [cpf, setCpf] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [password, setPassword] = useState('');
+  const [photo, setPhoto] = useState('');
+  const [documentPhoto, setDocumentPhoto] = useState('');
   const [stores, setStores] = useState<Store[]>(STORES);
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
@@ -72,21 +77,55 @@ export default function App() {
   }, [screen, order?.id]);
 
   async function boot() {
-    const n = await AsyncStorage.getItem('clientName');
-    const p = await AsyncStorage.getItem('clientPhone');
-    const a = await AsyncStorage.getItem('clientAddress');
-    if (n) { setName(n); setPhone(p || ''); setAddress(a || ''); setScreen('home'); }
+    const saved = await AsyncStorage.getItem('clientUser');
+    const logged = await AsyncStorage.getItem('clientLoggedIn');
+    if (saved && logged === 'yes') {
+      const u = JSON.parse(saved);
+      setName(u.name || '');
+      setCpf(u.cpf || '');
+      setPhone(u.phone || '');
+      setAddress(u.address || '');
+      setPhoto(u.photo || '');
+      setDocumentPhoto(u.documentPhoto || '');
+      setScreen('home');
+    } else {
+      setScreen('login');
+    }
     loadStores();
   }
   async function loadStores() {
     try { const r = await fetch(`${API}/stores`); const d = await r.json(); if (Array.isArray(d)) setStores(d); } catch {}
   }
   async function login() {
-    if (!name.trim() || !phone.trim()) return Alert.alert('Atenção', 'Digite nome e WhatsApp.');
-    await AsyncStorage.setItem('clientName', name);
-    await AsyncStorage.setItem('clientPhone', phone);
-    await AsyncStorage.setItem('clientAddress', address);
+    if (!cpf.trim() || !password.trim()) return Alert.alert('Atenção', 'Digite CPF e senha.');
+    const saved = await AsyncStorage.getItem('clientUser');
+    if (!saved) return Alert.alert('Cadastro necessário', 'Crie seu cadastro antes de entrar.');
+    const u = JSON.parse(saved);
+    if (onlyDigits(u.cpf) !== onlyDigits(cpf) || u.password !== password) return Alert.alert('Login inválido', 'CPF ou senha incorretos.');
+    setName(u.name || ''); setPhone(u.phone || ''); setAddress(u.address || ''); setPhoto(u.photo || ''); setDocumentPhoto(u.documentPhoto || '');
+    await AsyncStorage.setItem('clientLoggedIn', 'yes');
     setScreen('home');
+  }
+  async function registerClient() {
+    if (!name.trim() || !cpf.trim() || !phone.trim() || !password.trim()) return Alert.alert('Atenção', 'Preencha nome, CPF, telefone e senha.');
+    const user = { name, cpf, phone, address, password, photo, documentPhoto, createdAt: new Date().toISOString() };
+    await AsyncStorage.setItem('clientUser', JSON.stringify(user));
+    await AsyncStorage.setItem('clientLoggedIn', 'yes');
+    setScreen('home');
+  }
+  async function logout() {
+    await AsyncStorage.removeItem('clientLoggedIn');
+    setPassword('');
+    setScreen('login');
+  }
+  function onlyDigits(v: string) { return String(v || '').replace(/\D/g, ''); }
+  async function pickImage(kind: 'photo' | 'doc') {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return Alert.alert('Permissão necessária', 'Permita acesso às fotos para enviar a imagem.');
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.75, allowsEditing: false });
+    if (!res.canceled && res.assets?.[0]?.uri) {
+      if (kind === 'photo') setPhoto(res.assets[0].uri); else setDocumentPhoto(res.assets[0].uri);
+    }
   }
   async function openStore(s: Store) {
     setStore(s); setCat('Todos'); setQuery('');
@@ -151,7 +190,9 @@ export default function App() {
       customer_name: name,
       customerPhone: phone,
       customer_phone: phone,
-      customer: { name, phone, address },
+      customerCpf: cpf,
+      customer_cpf: cpf,
+      customer: { name, cpf, phone, address, photo, documentPhoto },
       address,
       delivery_address: address,
       items: normalizedItems,
@@ -185,7 +226,9 @@ export default function App() {
     setScreen('tracking');
   }
 
-  if (screen === 'login') return <SafeAreaView style={s.bg}><StatusBar style="light"/><RNStatusBar barStyle="light-content" backgroundColor={C.bg}/><ScrollView contentContainerStyle={s.login}><View style={s.logo}><Text style={{fontSize:42}}>🍺</Text></View><Text style={s.title}>CHAMA ADEGA</Text><Text style={s.subCenter}>Sua bebida chegou.</Text><Input ph="Seu nome" v={name} set={setName}/><Input ph="WhatsApp" v={phone} set={setPhone}/><Input ph="Endereço de entrega" v={address} set={setAddress}/><Button title="ENTRAR" onPress={login}/></ScrollView></SafeAreaView>;
+  if (screen === 'login') return <SafeAreaView style={s.bg}><StatusBar style="light"/><RNStatusBar barStyle="light-content" backgroundColor={C.bg}/><ScrollView contentContainerStyle={s.login}><View style={s.logo}><Text style={{fontSize:42}}>🍺</Text></View><Text style={s.title}>CHAMA ADEGA</Text><Text style={s.subCenter}>Entrar com CPF e senha</Text><Input ph="CPF" v={cpf} set={setCpf}/><Input ph="Senha" v={password} set={setPassword} secureTextEntry/><Button title="ENTRAR" onPress={login}/><TouchableOpacity style={s.linkBtn} onPress={() => setScreen('register')}><Text style={s.linkText}>Criar cadastro do cliente</Text></TouchableOpacity></ScrollView></SafeAreaView>;
+
+  if (screen === 'register') return <SafeAreaView style={s.bg}><StatusBar style="light"/><RNStatusBar barStyle="light-content" backgroundColor={C.bg}/><ScrollView contentContainerStyle={s.login}><View style={s.logo}><Text style={{fontSize:42}}>🍺</Text></View><Text style={s.title}>CADASTRO CLIENTE</Text><Text style={s.subCenter}>CPF, telefone, foto e documento</Text><Input ph="Nome completo" v={name} set={setName}/><Input ph="CPF" v={cpf} set={setCpf}/><Input ph="Telefone / WhatsApp" v={phone} set={setPhone}/><Input ph="Endereço de entrega" v={address} set={setAddress}/><Input ph="Senha" v={password} set={setPassword} secureTextEntry/><View style={s.uploadRow}><TouchableOpacity style={s.uploadBox} onPress={() => pickImage('photo')}>{photo ? <Image source={{uri: photo}} style={s.uploadImg}/> : <Text style={s.uploadText}>📷 Foto do cliente</Text>}</TouchableOpacity><TouchableOpacity style={s.uploadBox} onPress={() => pickImage('doc')}>{documentPhoto ? <Image source={{uri: documentPhoto}} style={s.uploadImg}/> : <Text style={s.uploadText}>🪪 Foto do documento</Text>}</TouchableOpacity></View><Button title="CADASTRAR E ENTRAR" onPress={registerClient}/><TouchableOpacity style={s.linkBtn} onPress={() => setScreen('login')}><Text style={s.linkText}>Já tenho cadastro</Text></TouchableOpacity></ScrollView></SafeAreaView>;
 
   if (screen === 'store' && store) return <SafeAreaView style={s.bg}><Header title={store.store_name || store.name || 'Adega'} back={() => setScreen('home')}/><ScrollView contentContainerStyle={{paddingBottom:105}}><View style={s.cover}><Text style={s.coverBrand}>CHAMA ADEGA</Text><Text style={{fontSize:80}}>🍾</Text><Text style={s.coverSub}>🟢 Aberta • Online • {store.delivery_time || '25-35 min'}</Text></View><View style={s.storeHead}><Text style={s.big}>{store.store_name || store.name}</Text><Text style={s.sub}>⭐ {store.rating || 4.8} • Entrega R$ {delivery.toFixed(2)}</Text><TextInput style={s.search} placeholder="Buscar cerveja, gelo, whisky..." placeholderTextColor={C.muted} value={query} onChangeText={setQuery}/></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catRow}>{['Todos','Promoções','Cervejas','Vinhos','Destilados','Gelo','Refrigerantes','Combos'].map(c => <TouchableOpacity key={c} onPress={() => setCat(c)}><Chip title={c} on={cat === c}/></TouchableOpacity>)}</ScrollView>{visibleProducts.length === 0 ? <View style={s.empty}><Text style={s.white}>Nenhum produto encontrado</Text><Text style={s.sub}>Tente outra categoria.</Text></View> : visibleProducts.map(p => <View key={p.id} style={s.product}><View style={s.prodImg}><Text style={{fontSize:36}}>{p.category === 'Gelo' ? '🧊' : p.category === 'Destilados' ? '🥃' : '🍺'}</Text></View><View style={{flex:1}}><Text style={s.pname}>{p.name || p.title || p.product_name}</Text><Text style={s.sub}>{p.category || 'Bebidas'}</Text><Text style={s.price}>R$ {price(p).toFixed(2)}</Text></View><TouchableOpacity style={s.add} onPress={() => add(p)}><Text style={s.addText}>+</Text></TouchableOpacity></View>)}</ScrollView>{cart.length > 0 && <TouchableOpacity style={s.cartBar} onPress={() => setScreen('cart')}><Text style={s.cartText}>Ver carrinho • {cart.reduce((n,p)=>n+p.qty,0)} itens • R$ {subtotal.toFixed(2)}</Text></TouchableOpacity>}</SafeAreaView>;
 
@@ -195,7 +238,7 @@ export default function App() {
 
   if (screen === 'tracking') return <SafeAreaView style={s.bg}><Header title="Acompanhar pedido" back={() => setScreen('home')}/><View style={s.mapBox}><OSMMap/></View><ScrollView contentContainerStyle={{padding:16}}><View style={s.track}><Text style={s.big}>Pedido #{order?.id || 'novo'}</Text><Text style={s.sub}>Código de segurança</Text><Text style={s.code}>{order?.securityCode || order?.deliveryCode || securityCode || '----'}</Text><Text style={s.sub}>Status atual: {st()}</Text><Step active title="Pedido recebido"/><Step active={stepAtLeast(2)} title="Adega preparando"/><Step active={stepAtLeast(3)} title="Entregador indo até a adega"/><Step active={stepAtLeast(4)} title="Pedido retirado"/><Step active={stepAtLeast(5)} title="A caminho do cliente"/><Step active={stepAtLeast(6)} title="Pedido entregue"/><View style={s.contactRow}><Small title="📞 Ligar" onPress={call}/><Small title="💬 WhatsApp" onPress={zap}/><Small dark title="Cancelar" onPress={() => Alert.alert('Cancelar','Cancelamento solicitado.')}/></View></View></ScrollView></SafeAreaView>;
 
-  if (screen === 'profile') return <SafeAreaView style={s.bg}><Header title="Perfil" back={() => setScreen('home')}/><ScrollView contentContainerStyle={{padding:16,paddingBottom:95}}><Panel title={name || 'Cliente'}><Text style={s.sub}>{phone}</Text><Text style={s.sub}>{address}</Text></Panel>{['Meus pedidos','Favoritos','Cupons','Carteira','Endereços','Configurações'].map(x => <TouchableOpacity key={x} style={s.menuLine} onPress={() => openPage(x)}><Text style={s.white}>{x}</Text><Text style={s.sub}>›</Text></TouchableOpacity>)}</ScrollView><Nav screen={screen} setScreen={setScreen}/></SafeAreaView>;
+  if (screen === 'profile') return <SafeAreaView style={s.bg}><Header title="Perfil" back={() => setScreen('home')}/><ScrollView contentContainerStyle={{padding:16,paddingBottom:95}}><Panel title={name || 'Cliente'}><View style={s.profileTop}>{photo ? <Image source={{uri: photo}} style={s.avatar}/> : <View style={s.avatarFake}><Text style={{fontSize:32}}>👤</Text></View>}<View style={{flex:1}}><Text style={s.sub}>CPF: {cpf || 'Não informado'}</Text><Text style={s.sub}>{phone}</Text><Text style={s.sub}>{address}</Text><Text style={documentPhoto ? s.green : s.sub}>{documentPhoto ? 'Documento enviado' : 'Documento pendente'}</Text></View></View></Panel>{['Meus pedidos','Favoritos','Cupons','Carteira','Endereços','Configurações'].map(x => <TouchableOpacity key={x} style={s.menuLine} onPress={() => openPage(x)}><Text style={s.white}>{x}</Text><Text style={s.sub}>›</Text></TouchableOpacity>)}<TouchableOpacity style={s.menuLine} onPress={logout}><Text style={s.white}>Sair da conta</Text><Text style={s.sub}>›</Text></TouchableOpacity></ScrollView><Nav screen={screen} setScreen={setScreen}/></SafeAreaView>;
 
   if (screen === 'menuPage') return <SafeAreaView style={s.bg}><Header title={pageTitle} back={() => setScreen('profile')}/><View style={s.pageBox}><Text style={s.big}>{pageTitle}</Text><Text style={s.sub}>Área preparada para integração real com a API.</Text>{pageTitle === 'Cupons' && <Text style={s.code}>CHAMA10</Text>}{pageTitle === 'Endereços' && <Text style={s.white}>{address || 'Nenhum endereço cadastrado'}</Text>}</View></SafeAreaView>;
 
@@ -203,7 +246,7 @@ export default function App() {
 }
 
 function OSMMap() { const html = `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>html,body,#map{height:100%;margin:0;background:#101114}.leaflet-tile{filter:brightness(.55) saturate(.65)}.leaflet-control-attribution{display:none}</style></head><body><div id="map"></div><script>var map=L.map('map',{zoomControl:false,attributionControl:false}).setView([-23.355,-47.856],13);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);L.marker([-23.355,-47.856]).addTo(map);</script></body></html>`; return <WebView source={{html}} style={{flex:1}}/>; }
-function Input({ph,v,set}: any) { return <TextInput style={s.input} placeholder={ph} placeholderTextColor={C.muted} value={v} onChangeText={set}/>; }
+function Input({ph,v,set,...rest}: any) { return <TextInput style={s.input} placeholder={ph} placeholderTextColor={C.muted} value={v} onChangeText={set} {...rest}/>; }
 function Button({title,onPress}: any) { return <TouchableOpacity style={s.btn} onPress={onPress}><Text style={s.btnText}>{title}</Text></TouchableOpacity>; }
 function Small({title,onPress,dark}: any) { return <TouchableOpacity style={dark ? s.smallDark : s.small} onPress={onPress}><Text style={dark ? s.white : s.smallText}>{title}</Text></TouchableOpacity>; }
 function Header({title,back}: any) { return <View style={s.header}><TouchableOpacity onPress={back}><Text style={s.back}>‹</Text></TouchableOpacity><Text style={s.htitle}>{title}</Text><Text style={s.back}> </Text></View>; }
@@ -214,7 +257,7 @@ function Step({title,active}: any) { return <View style={s.step}><View style={[s
 function Nav({screen,setScreen}: any) { return <View style={s.nav}><TouchableOpacity onPress={() => setScreen('home')}><Text style={screen === 'home' ? s.navA : s.navT}>🏠{`\n`}Início</Text></TouchableOpacity><TouchableOpacity onPress={() => setScreen('tracking')}><Text style={screen === 'tracking' ? s.navA : s.navT}>📦{`\n`}Pedidos</Text></TouchableOpacity><TouchableOpacity onPress={() => setScreen('profile')}><Text style={screen === 'profile' ? s.navA : s.navT}>👤{`\n`}Perfil</Text></TouchableOpacity></View>; }
 
 const s = StyleSheet.create({
-  bg:{flex:1,backgroundColor:C.bg}, login:{flexGrow:1,justifyContent:'center',padding:24}, logo:{width:96,height:96,borderRadius:48,backgroundColor:C.gold,alignItems:'center',justifyContent:'center',alignSelf:'center',marginBottom:22}, title:{color:C.text,fontSize:32,fontWeight:'900',textAlign:'center',letterSpacing:1}, subCenter:{color:C.gold2,textAlign:'center',fontWeight:'800',marginBottom:18}, sub:{color:C.muted,fontWeight:'700'}, input:{backgroundColor:C.panel2,color:C.text,borderRadius:14,padding:16,marginTop:12,borderWidth:1,borderColor:C.line}, btn:{backgroundColor:C.gold,borderRadius:14,padding:16,alignItems:'center',marginTop:16}, btnText:{color:'#151515',fontWeight:'900'},
+  bg:{flex:1,backgroundColor:C.bg}, login:{flexGrow:1,justifyContent:'center',padding:24}, logo:{width:96,height:96,borderRadius:48,backgroundColor:C.gold,alignItems:'center',justifyContent:'center',alignSelf:'center',marginBottom:22}, title:{color:C.text,fontSize:32,fontWeight:'900',textAlign:'center',letterSpacing:1}, subCenter:{color:C.gold2,textAlign:'center',fontWeight:'800',marginBottom:18}, sub:{color:C.muted,fontWeight:'700'}, input:{backgroundColor:C.panel2,color:C.text,borderRadius:14,padding:16,marginTop:12,borderWidth:1,borderColor:C.line}, linkBtn:{alignItems:'center',padding:15,marginTop:8}, linkText:{color:C.gold,fontWeight:'900'}, uploadRow:{flexDirection:'row',gap:10,marginTop:14}, uploadBox:{flex:1,height:118,borderRadius:16,backgroundColor:C.panel2,borderWidth:1,borderColor:C.line,alignItems:'center',justifyContent:'center',overflow:'hidden'}, uploadImg:{width:'100%',height:'100%'}, uploadText:{color:C.text,fontWeight:'900',textAlign:'center'}, profileTop:{flexDirection:'row',gap:14,alignItems:'center',marginTop:8}, avatar:{width:76,height:76,borderRadius:38}, avatarFake:{width:76,height:76,borderRadius:38,backgroundColor:C.panel2,alignItems:'center',justifyContent:'center'}, btn:{backgroundColor:C.gold,borderRadius:14,padding:16,alignItems:'center',marginTop:16}, btnText:{color:'#151515',fontWeight:'900'},
   top:{paddingTop:42,paddingHorizontal:18,paddingBottom:14,backgroundColor:C.bg2,flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderBottomWidth:1,borderBottomColor:C.line}, brand:{color:C.text,fontSize:22,fontWeight:'900'}, location:{color:C.muted,fontWeight:'800',marginTop:5}, delivery:{color:C.gold,fontWeight:'900',marginTop:3}, cartMini:{backgroundColor:C.panel,paddingHorizontal:13,paddingVertical:10,borderRadius:999,borderWidth:1,borderColor:C.line}, cartMiniText:{color:C.gold,fontWeight:'900'},
   search:{backgroundColor:C.panel2,color:C.text,borderRadius:16,padding:16,borderWidth:1,borderColor:C.line,marginTop:8}, banner:{marginTop:16,backgroundColor:C.panel,borderRadius:26,padding:18,flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderWidth:1,borderColor:C.line}, bannerKicker:{color:C.gold,fontSize:12,fontWeight:'900',letterSpacing:1}, bannerTitle:{color:C.text,fontSize:27,fontWeight:'900',marginTop:6}, bannerSub:{color:C.muted,fontWeight:'800',marginTop:6}, bannerBtn:{backgroundColor:C.gold,borderRadius:12,paddingHorizontal:14,paddingVertical:10,marginTop:14,alignSelf:'flex-start'}, bannerBtnText:{color:'#111',fontWeight:'900'}, section:{color:C.text,fontSize:19,fontWeight:'900',marginTop:22,marginBottom:12},
   category:{backgroundColor:C.panel,borderRadius:18,padding:14,alignItems:'center',marginRight:10,width:96,borderWidth:1,borderColor:C.line}, catText:{color:C.text,fontWeight:'800',fontSize:12,marginTop:6,textAlign:'center'}, store:{backgroundColor:C.panel,borderRadius:20,padding:16,marginBottom:12,flexDirection:'row',alignItems:'center',gap:14,borderWidth:1,borderColor:C.line}, storeIcon:{width:62,height:62,borderRadius:18,backgroundColor:C.panel2,alignItems:'center',justifyContent:'center'}, pname:{color:C.text,fontSize:17,fontWeight:'900'}, green:{color:C.green,fontWeight:'900',marginTop:4}, arrow:{color:C.muted,fontSize:36},
