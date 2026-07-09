@@ -1,268 +1,54 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Linking, SafeAreaView, ScrollView, StatusBar as RNStatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import { Alert, Image, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { WebView } from 'react-native-webview';
 import * as ImagePicker from 'expo-image-picker';
 
 const API = 'https://chamabebidas.com.br/api';
-const C = {
-  bg: '#101114',
-  bg2: '#17191F',
-  panel: '#1D2028',
-  panel2: '#252A34',
-  line: '#343A46',
-  text: '#FFFFFF',
-  muted: '#A7ABB4',
-  gold: '#FFC107',
-  gold2: '#FFE08A',
-  green: '#22C55E',
-  red: '#EF4444',
-  orange: '#F97316',
-};
+const C = { bg:'#101114', card:'#1D2028', card2:'#252A34', line:'#343A46', text:'#FFFFFF', muted:'#A7ABB4', gold:'#FFC107', green:'#22C55E', red:'#EF4444' };
+type Screen='login'|'register'|'home'|'store'|'cart'|'profile';
+type Store={id:any; name?:string; store_name?:string; nome?:string; address?:string; phone?:string; photo?:string; logo?:string};
+type Product={id:any; name?:string; title?:string; product_name?:string; nome?:string; price?:any; preco?:any; category?:string; image?:string; store_id?:any};
 
-type Screen = 'login' | 'register' | 'home' | 'store' | 'cart' | 'checkout' | 'tracking' | 'profile' | 'menuPage';
-type Store = { id: any; name?: string; store_name?: string; address?: string; rating?: number; delivery_time?: string; delivery_fee?: number };
-type Product = { id: any; name?: string; title?: string; product_name?: string; price?: number; category?: string; offer?: boolean };
+const demoStores: Store[] = [{id:1, store_name:'Chama Adega', address:'Tatuí - SP'}];
+const demoProducts: Product[] = [{id:1,name:'Cerveja lata gelada',price:5.5,category:'Cervejas'},{id:2,name:'Gelo 5kg',price:10,category:'Gelo'}];
 
-const STORES: Store[] = [
-  { id: 1, store_name: 'Chama Adega', address: 'Tatuí - SP', rating: 4.9, delivery_time: '25-35 min', delivery_fee: 7 },
-  { id: 2, store_name: 'Adega Central', address: 'Centro - Tatuí', rating: 4.7, delivery_time: '30-40 min', delivery_fee: 8 },
-];
-const PRODUCTS: Product[] = [
-  { id: 1, name: 'Cerveja lata gelada', price: 5.5, category: 'Cervejas', offer: true },
-  { id: 2, name: 'Gelo pacote 5kg', price: 10, category: 'Gelo' },
-  { id: 3, name: 'Energético 2L', price: 14.9, category: 'Energéticos' },
-  { id: 4, name: 'Vodka premium', price: 39.9, category: 'Destilados' },
-  { id: 5, name: 'Combo cerveja + gelo', price: 49.9, category: 'Combos', offer: true },
-  { id: 6, name: 'Refrigerante 2L', price: 11.9, category: 'Refrigerantes' },
-];
-const CATS = [['🍺','Cervejas'], ['🍷','Vinhos'], ['🥃','Destilados'], ['🧊','Gelo'], ['🥤','Refrigerantes'], ['🍟','Petiscos'], ['🎁','Combos']];
-
-export default function App() {
-  const [screen, setScreen] = useState<Screen>('login');
-  const [name, setName] = useState('');
-  const [cpf, setCpf] = useState('');
-  const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [password, setPassword] = useState('');
-  const [photo, setPhoto] = useState('');
-  const [documentPhoto, setDocumentPhoto] = useState('');
-  const [stores, setStores] = useState<Store[]>(STORES);
-  const [store, setStore] = useState<Store | null>(null);
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
-  const [cart, setCart] = useState<any[]>([]);
-  const [order, setOrder] = useState<any | null>(null);
-  const [query, setQuery] = useState('');
-  const [cat, setCat] = useState('Todos');
-  const [coupon, setCoupon] = useState('');
-  const [payment, setPayment] = useState('PIX');
-  const [pageTitle, setPageTitle] = useState('');
-  const [securityCode, setSecurityCode] = useState('');
-
-  useEffect(() => { boot(); }, []);
-
-  useEffect(() => {
-    if (screen !== 'tracking' || !order?.id || String(order.id).startsWith('PED_DEMO')) return;
-    const timer = setInterval(async () => {
-      try {
-        const r = await fetch(`${API}/orders/${order.id}`);
-        if (!r.ok) return;
-        const d = await r.json();
-        const fresh = d.order || d.data || d;
-        if (fresh && fresh.id) setOrder((old: any) => ({ ...old, ...fresh }));
-      } catch {}
-    }, 10000);
-    return () => clearInterval(timer);
-  }, [screen, order?.id]);
-
-  async function boot() {
-    const saved = await AsyncStorage.getItem('clientUser');
-    const logged = await AsyncStorage.getItem('clientLoggedIn');
-    if (saved && logged === 'yes') {
-      const u = JSON.parse(saved);
-      setName(u.name || '');
-      setCpf(u.cpf || '');
-      setPhone(u.phone || '');
-      setAddress(u.address || '');
-      setPhoto(u.photo || '');
-      setDocumentPhoto(u.documentPhoto || '');
-      setScreen('home');
-    } else {
-      setScreen('login');
-    }
-    loadStores();
+async function apiGet(paths:string[]) {
+  for (const p of paths) {
+    try { const r = await fetch(`${API}${p}`); if (r.ok) return await r.json(); } catch {}
   }
-  async function loadStores() {
-    try { const r = await fetch(`${API}/stores`); const d = await r.json(); if (Array.isArray(d)) setStores(d); } catch {}
-  }
-  async function login() {
-    if (!cpf.trim() || !password.trim()) return Alert.alert('Atenção', 'Digite CPF e senha.');
-    const saved = await AsyncStorage.getItem('clientUser');
-    if (!saved) return Alert.alert('Cadastro necessário', 'Crie seu cadastro antes de entrar.');
-    const u = JSON.parse(saved);
-    if (onlyDigits(u.cpf) !== onlyDigits(cpf) || u.password !== password) return Alert.alert('Login inválido', 'CPF ou senha incorretos.');
-    setName(u.name || ''); setPhone(u.phone || ''); setAddress(u.address || ''); setPhoto(u.photo || ''); setDocumentPhoto(u.documentPhoto || '');
-    await AsyncStorage.setItem('clientLoggedIn', 'yes');
-    setScreen('home');
-  }
-  async function registerClient() {
-    if (!name.trim() || !cpf.trim() || !phone.trim() || !password.trim()) return Alert.alert('Atenção', 'Preencha nome, CPF, telefone e senha.');
-    const user = { name, cpf, phone, address, password, photo, documentPhoto, createdAt: new Date().toISOString() };
-    await AsyncStorage.setItem('clientUser', JSON.stringify(user));
-    await AsyncStorage.setItem('clientLoggedIn', 'yes');
-    setScreen('home');
-  }
-  async function logout() {
-    await AsyncStorage.removeItem('clientLoggedIn');
-    setPassword('');
-    setScreen('login');
-  }
-  function onlyDigits(v: string) { return String(v || '').replace(/\D/g, ''); }
-  async function pickImage(kind: 'photo' | 'doc') {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return Alert.alert('Permissão necessária', 'Permita acesso às fotos para enviar a imagem.');
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.75, allowsEditing: false });
-    if (!res.canceled && res.assets?.[0]?.uri) {
-      if (kind === 'photo') setPhoto(res.assets[0].uri); else setDocumentPhoto(res.assets[0].uri);
-    }
-  }
-  async function openStore(s: Store) {
-    setStore(s); setCat('Todos'); setQuery('');
-    try {
-      const r = await fetch(`${API}/stores/${s.id}/products`);
-      const d = await r.json();
-      const arr = Array.isArray(d) ? d : d.products || d.data;
-      if (Array.isArray(arr)) setProducts(arr); else setProducts(PRODUCTS);
-    } catch { setProducts(PRODUCTS); }
-    setScreen('store');
-  }
-  function price(p: any) { return Number(p.price || 0); }
-  function add(p: any) { setCart(c => { const i = c.findIndex(x => String(x.id) === String(p.id)); if (i >= 0) { const n = [...c]; n[i].qty += 1; return n; } return [...c, { ...p, qty: 1 }]; }); }
-  function dec(p: any) { setCart(c => c.map(x => x.id === p.id ? { ...x, qty: x.qty - 1 } : x).filter(x => x.qty > 0)); }
-  function openPage(t: string) { setPageTitle(t); setScreen('menuPage'); }
-  function makeCode() { return String(Math.floor(1000 + Math.random() * 9000)); }
-  function zap() { Linking.openURL(`https://wa.me/55${phone.replace(/\D/g, '')}`); }
-  function call() { Linking.openURL(`tel:${phone.replace(/\D/g, '')}`); }
-
-  const visibleProducts = useMemo(() => products.filter(p => {
-    const n = (p.name || p.title || p.product_name || '').toLowerCase();
-    const byQ = !query || n.includes(query.toLowerCase()) || (p.category || '').toLowerCase().includes(query.toLowerCase());
-    const byC = cat === 'Todos' || (cat === 'Promoções' ? !!p.offer : (p.category || '') === cat);
-    return byQ && byC;
-  }), [products, query, cat]);
-  const homeStores = useMemo(() => stores.filter(s => {
-    const q = query.toLowerCase();
-    return !query || (s.store_name || s.name || '').toLowerCase().includes(q) || (s.address || '').toLowerCase().includes(q);
-  }), [stores, query]);
-  const subtotal = useMemo(() => cart.reduce((sum, p) => sum + price(p) * p.qty, 0), [cart]);
-  const delivery = Number(store?.delivery_fee || 7);
-  const discount = coupon.trim().toUpperCase() === 'CHAMA10' ? 10 : 0;
-  const total = Math.max(0, subtotal + delivery - discount);
-
-  function st() { return String(order?.status || 'pending'); }
-  function isStep(names: string[]) { return names.includes(st()); }
-  function stepAtLeast(level: number) {
-    const map: any = { pending: 1, accepted: 2, preparing: 2, ready: 3, calling_driver: 3, driver_accepted: 4, picked_up: 5, delivered: 6, completed: 6 };
-    return (map[st()] || 1) >= level;
-  }
-
-  async function finish() {
-    const code = securityCode || makeCode();
-    setSecurityCode(code);
-    const normalizedItems = cart.map((p: any) => ({
-      id: p.id,
-      productId: p.id,
-      product_id: p.id,
-      name: p.name || p.title || p.product_name || 'Produto',
-      product_name: p.name || p.title || p.product_name || 'Produto',
-      qty: p.qty,
-      quantity: p.qty,
-      price: price(p),
-      unit_price: price(p),
-      subtotal: price(p) * p.qty,
-    }));
-    const payload = {
-      storeId: store?.id || 1,
-      store_id: store?.id || 1,
-      storeName: store?.store_name || store?.name || 'Chama Adega',
-      customerName: name,
-      customer_name: name,
-      customerPhone: phone,
-      customer_phone: phone,
-      customerCpf: cpf,
-      customer_cpf: cpf,
-      customer: { name, cpf, phone, address, photo, documentPhoto },
-      address,
-      delivery_address: address,
-      items: normalizedItems,
-      subtotal,
-      delivery_fee: delivery,
-      total,
-      total_amount: total,
-      amount: total,
-      paymentMethod: payment,
-      payment_method: payment,
-      status: 'pending',
-      securityCode: code,
-      security_code: code,
-      deliveryCode: code,
-      delivery_code: code,
-      pickupCode: code,
-      pickup_code: code,
-      createdAt: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-    };
-    try {
-      const r = await fetch(`${API}/orders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const d = await r.json();
-      const saved = d.order || d.data || d;
-      setOrder({ ...payload, ...saved });
-    } catch {
-      setOrder({ id: 'PED_DEMO', ...payload });
-      Alert.alert('Modo demonstração', 'Não consegui enviar para a API. O pedido ficou apenas neste celular.');
-    }
-    setCart([]);
-    setScreen('tracking');
-  }
-
-  if (screen === 'login') return <SafeAreaView style={s.bg}><StatusBar style="light"/><RNStatusBar barStyle="light-content" backgroundColor={C.bg}/><ScrollView contentContainerStyle={s.login}><View style={s.logo}><Text style={{fontSize:42}}>🍺</Text></View><Text style={s.title}>CHAMA ADEGA</Text><Text style={s.subCenter}>Entrar com CPF e senha</Text><Input ph="CPF" v={cpf} set={setCpf}/><Input ph="Senha" v={password} set={setPassword} secureTextEntry/><Button title="ENTRAR" onPress={login}/><TouchableOpacity style={s.linkBtn} onPress={() => setScreen('register')}><Text style={s.linkText}>Criar cadastro do cliente</Text></TouchableOpacity></ScrollView></SafeAreaView>;
-
-  if (screen === 'register') return <SafeAreaView style={s.bg}><StatusBar style="light"/><RNStatusBar barStyle="light-content" backgroundColor={C.bg}/><ScrollView contentContainerStyle={s.login}><View style={s.logo}><Text style={{fontSize:42}}>🍺</Text></View><Text style={s.title}>CADASTRO CLIENTE</Text><Text style={s.subCenter}>CPF, telefone, foto e documento</Text><Input ph="Nome completo" v={name} set={setName}/><Input ph="CPF" v={cpf} set={setCpf}/><Input ph="Telefone / WhatsApp" v={phone} set={setPhone}/><Input ph="Endereço de entrega" v={address} set={setAddress}/><Input ph="Senha" v={password} set={setPassword} secureTextEntry/><View style={s.uploadRow}><TouchableOpacity style={s.uploadBox} onPress={() => pickImage('photo')}>{photo ? <Image source={{uri: photo}} style={s.uploadImg}/> : <Text style={s.uploadText}>📷 Foto do cliente</Text>}</TouchableOpacity><TouchableOpacity style={s.uploadBox} onPress={() => pickImage('doc')}>{documentPhoto ? <Image source={{uri: documentPhoto}} style={s.uploadImg}/> : <Text style={s.uploadText}>🪪 Foto do documento</Text>}</TouchableOpacity></View><Button title="CADASTRAR E ENTRAR" onPress={registerClient}/><TouchableOpacity style={s.linkBtn} onPress={() => setScreen('login')}><Text style={s.linkText}>Já tenho cadastro</Text></TouchableOpacity></ScrollView></SafeAreaView>;
-
-  if (screen === 'store' && store) return <SafeAreaView style={s.bg}><Header title={store.store_name || store.name || 'Adega'} back={() => setScreen('home')}/><ScrollView contentContainerStyle={{paddingBottom:105}}><View style={s.cover}><Text style={s.coverBrand}>CHAMA ADEGA</Text><Text style={{fontSize:80}}>🍾</Text><Text style={s.coverSub}>🟢 Aberta • Online • {store.delivery_time || '25-35 min'}</Text></View><View style={s.storeHead}><Text style={s.big}>{store.store_name || store.name}</Text><Text style={s.sub}>⭐ {store.rating || 4.8} • Entrega R$ {delivery.toFixed(2)}</Text><TextInput style={s.search} placeholder="Buscar cerveja, gelo, whisky..." placeholderTextColor={C.muted} value={query} onChangeText={setQuery}/></View><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.catRow}>{['Todos','Promoções','Cervejas','Vinhos','Destilados','Gelo','Refrigerantes','Combos'].map(c => <TouchableOpacity key={c} onPress={() => setCat(c)}><Chip title={c} on={cat === c}/></TouchableOpacity>)}</ScrollView>{visibleProducts.length === 0 ? <View style={s.empty}><Text style={s.white}>Nenhum produto encontrado</Text><Text style={s.sub}>Tente outra categoria.</Text></View> : visibleProducts.map(p => <View key={p.id} style={s.product}><View style={s.prodImg}><Text style={{fontSize:36}}>{p.category === 'Gelo' ? '🧊' : p.category === 'Destilados' ? '🥃' : '🍺'}</Text></View><View style={{flex:1}}><Text style={s.pname}>{p.name || p.title || p.product_name}</Text><Text style={s.sub}>{p.category || 'Bebidas'}</Text><Text style={s.price}>R$ {price(p).toFixed(2)}</Text></View><TouchableOpacity style={s.add} onPress={() => add(p)}><Text style={s.addText}>+</Text></TouchableOpacity></View>)}</ScrollView>{cart.length > 0 && <TouchableOpacity style={s.cartBar} onPress={() => setScreen('cart')}><Text style={s.cartText}>Ver carrinho • {cart.reduce((n,p)=>n+p.qty,0)} itens • R$ {subtotal.toFixed(2)}</Text></TouchableOpacity>}</SafeAreaView>;
-
-  if (screen === 'cart') return <SafeAreaView style={s.bg}><Header title="Carrinho" back={() => setScreen(store ? 'store' : 'home')}/><ScrollView contentContainerStyle={{padding:16,paddingBottom:100}}>{cart.length === 0 && <Panel title="Carrinho vazio"><Text style={s.sub}>Adicione produtos para continuar.</Text></Panel>}{cart.map(p => <View key={p.id} style={s.cartItem}><View><Text style={s.pname}>{p.name || p.title}</Text><Text style={s.price}>R$ {(price(p) * p.qty).toFixed(2)}</Text></View><View style={s.qty}><TouchableOpacity onPress={() => dec(p)}><Text style={s.qtyBtn}>−</Text></TouchableOpacity><Text style={s.white}>{p.qty}</Text><TouchableOpacity onPress={() => add(p)}><Text style={s.qtyBtn}>+</Text></TouchableOpacity></View></View>)}<View style={s.panel}><Text style={s.pname}>Resumo do pedido</Text><Line l="Subtotal" v={`R$ ${subtotal.toFixed(2)}`}/><Line l="Entrega" v={`R$ ${delivery.toFixed(2)}`}/><Line l="Desconto" v={`-R$ ${discount.toFixed(2)}`}/><Input ph="Cupom: CHAMA10" v={coupon} set={setCoupon}/><Text style={s.total}>Total: R$ {total.toFixed(2)}</Text><Button title="FINALIZAR" onPress={() => cart.length ? setScreen('checkout') : Alert.alert('Carrinho vazio','Adicione produtos primeiro.')}/></View></ScrollView></SafeAreaView>;
-
-  if (screen === 'checkout') return <SafeAreaView style={s.bg}><Header title="Pagamento" back={() => setScreen('cart')}/><ScrollView contentContainerStyle={{padding:16}}><Panel title="Entrega"><Text style={s.sub}>{address || 'Endereço não informado'}</Text></Panel><Panel title="Código de segurança"><Text style={s.code}>{securityCode || 'Será gerado'}</Text><Text style={s.sub}>Use esse código para confirmar retirada/entrega.</Text></Panel><Panel title="Forma de pagamento">{['PIX','Cartão','Dinheiro'].map(p => <TouchableOpacity key={p} style={[s.pay, payment === p && s.payOn]} onPress={() => setPayment(p)}><Text style={payment === p ? s.payTextOn : s.white}>{p}</Text></TouchableOpacity>)}</Panel><Panel title="Resumo"><Line l="Total" v={`R$ ${total.toFixed(2)}`}/><Button title="CONFIRMAR PEDIDO" onPress={finish}/></Panel></ScrollView></SafeAreaView>;
-
-  if (screen === 'tracking') return <SafeAreaView style={s.bg}><Header title="Acompanhar pedido" back={() => setScreen('home')}/><View style={s.mapBox}><OSMMap/></View><ScrollView contentContainerStyle={{padding:16}}><View style={s.track}><Text style={s.big}>Pedido #{order?.id || 'novo'}</Text><Text style={s.sub}>Código de segurança</Text><Text style={s.code}>{order?.securityCode || order?.deliveryCode || securityCode || '----'}</Text><Text style={s.sub}>Status atual: {st()}</Text><Step active title="Pedido recebido"/><Step active={stepAtLeast(2)} title="Adega preparando"/><Step active={stepAtLeast(3)} title="Entregador indo até a adega"/><Step active={stepAtLeast(4)} title="Pedido retirado"/><Step active={stepAtLeast(5)} title="A caminho do cliente"/><Step active={stepAtLeast(6)} title="Pedido entregue"/><View style={s.contactRow}><Small title="📞 Ligar" onPress={call}/><Small title="💬 WhatsApp" onPress={zap}/><Small dark title="Cancelar" onPress={() => Alert.alert('Cancelar','Cancelamento solicitado.')}/></View></View></ScrollView></SafeAreaView>;
-
-  if (screen === 'profile') return <SafeAreaView style={s.bg}><Header title="Perfil" back={() => setScreen('home')}/><ScrollView contentContainerStyle={{padding:16,paddingBottom:95}}><Panel title={name || 'Cliente'}><View style={s.profileTop}>{photo ? <Image source={{uri: photo}} style={s.avatar}/> : <View style={s.avatarFake}><Text style={{fontSize:32}}>👤</Text></View>}<View style={{flex:1}}><Text style={s.sub}>CPF: {cpf || 'Não informado'}</Text><Text style={s.sub}>{phone}</Text><Text style={s.sub}>{address}</Text><Text style={documentPhoto ? s.green : s.sub}>{documentPhoto ? 'Documento enviado' : 'Documento pendente'}</Text></View></View></Panel>{['Meus pedidos','Favoritos','Cupons','Carteira','Endereços','Configurações'].map(x => <TouchableOpacity key={x} style={s.menuLine} onPress={() => openPage(x)}><Text style={s.white}>{x}</Text><Text style={s.sub}>›</Text></TouchableOpacity>)}<TouchableOpacity style={s.menuLine} onPress={logout}><Text style={s.white}>Sair da conta</Text><Text style={s.sub}>›</Text></TouchableOpacity></ScrollView><Nav screen={screen} setScreen={setScreen}/></SafeAreaView>;
-
-  if (screen === 'menuPage') return <SafeAreaView style={s.bg}><Header title={pageTitle} back={() => setScreen('profile')}/><View style={s.pageBox}><Text style={s.big}>{pageTitle}</Text><Text style={s.sub}>Área preparada para integração real com a API.</Text>{pageTitle === 'Cupons' && <Text style={s.code}>CHAMA10</Text>}{pageTitle === 'Endereços' && <Text style={s.white}>{address || 'Nenhum endereço cadastrado'}</Text>}</View></SafeAreaView>;
-
-  return <SafeAreaView style={s.bg}><RNStatusBar barStyle="light-content" backgroundColor={C.bg}/><View style={s.top}><View><Text style={s.brand}>🍺 CHAMA ADEGA</Text><Text style={s.location}>📍 {address || 'Adicionar endereço'}  •  🟢 Aberta</Text><Text style={s.delivery}>Entrega 25-35 min</Text></View><TouchableOpacity onPress={() => setScreen('cart')} style={s.cartMini}><Text style={s.cartMiniText}>🛒 {cart.reduce((n,p)=>n+p.qty,0)}</Text></TouchableOpacity></View><ScrollView contentContainerStyle={{padding:16,paddingBottom:100}}><TextInput style={s.search} placeholder="Buscar bebidas..." placeholderTextColor={C.muted} value={query} onChangeText={setQuery}/><View style={s.banner}><View style={{flex:1}}><Text style={s.bannerKicker}>PROMOÇÕES DO DIA</Text><Text style={s.bannerTitle}>Bebida gelada em poucos minutos</Text><Text style={s.bannerSub}>Cerveja • Gelo • Combos • Destilados</Text><TouchableOpacity style={s.bannerBtn} onPress={() => { setCat('Promoções'); setStore(STORES[0]); setProducts(PRODUCTS); setScreen('store'); }}><Text style={s.bannerBtnText}>Ver ofertas</Text></TouchableOpacity></View><Text style={{fontSize:70}}>🍻</Text></View><Text style={s.section}>Categorias</Text><ScrollView horizontal showsHorizontalScrollIndicator={false}>{CATS.map(c => <TouchableOpacity key={c[1]} style={s.category} onPress={() => { setCat(c[1]); setStore(STORES[0]); setProducts(PRODUCTS); setScreen('store'); }}><Text style={{fontSize:28}}>{c[0]}</Text><Text style={s.catText}>{c[1]}</Text></TouchableOpacity>)}</ScrollView><Text style={s.section}>🔥 Adegas próximas</Text>{homeStores.map(st => <TouchableOpacity key={st.id} style={s.store} onPress={() => openStore(st)}><View style={s.storeIcon}><Text style={{fontSize:32}}>🏪</Text></View><View style={{flex:1}}><Text style={s.pname}>{st.store_name || st.name || 'Adega'}</Text><Text style={s.sub}>⭐ {st.rating || 4.8} • {st.delivery_time || '25-35 min'} • R$ {(st.delivery_fee || 7).toFixed(2)}</Text><Text style={s.green}>Aberta agora</Text></View><Text style={s.arrow}>›</Text></TouchableOpacity>)}</ScrollView><Nav screen={screen} setScreen={setScreen}/></SafeAreaView>;
+  return null;
 }
+async function apiPost(paths:string[], body:any) {
+  for (const p of paths) {
+    try { const r = await fetch(`${API}${p}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); if (r.ok) return await r.json(); } catch {}
+  }
+  return null;
+}
+const digits=(v:string)=>String(v||'').replace(/\D/g,'');
+const storeName=(s:Store)=>s.store_name||s.name||s.nome||'Adega';
+const prodName=(p:Product)=>p.name||p.title||p.product_name||p.nome||'Produto';
+const money=(n:any)=>`R$ ${Number(n||0).toFixed(2).replace('.',',')}`;
 
-function OSMMap() { const html = `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><style>html,body,#map{height:100%;margin:0;background:#101114}.leaflet-tile{filter:brightness(.55) saturate(.65)}.leaflet-control-attribution{display:none}</style></head><body><div id="map"></div><script>var map=L.map('map',{zoomControl:false,attributionControl:false}).setView([-23.355,-47.856],13);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);L.marker([-23.355,-47.856]).addTo(map);</script></body></html>`; return <WebView source={{html}} style={{flex:1}}/>; }
-function Input({ph,v,set,...rest}: any) { return <TextInput style={s.input} placeholder={ph} placeholderTextColor={C.muted} value={v} onChangeText={set} {...rest}/>; }
-function Button({title,onPress}: any) { return <TouchableOpacity style={s.btn} onPress={onPress}><Text style={s.btnText}>{title}</Text></TouchableOpacity>; }
-function Small({title,onPress,dark}: any) { return <TouchableOpacity style={dark ? s.smallDark : s.small} onPress={onPress}><Text style={dark ? s.white : s.smallText}>{title}</Text></TouchableOpacity>; }
-function Header({title,back}: any) { return <View style={s.header}><TouchableOpacity onPress={back}><Text style={s.back}>‹</Text></TouchableOpacity><Text style={s.htitle}>{title}</Text><Text style={s.back}> </Text></View>; }
-function Chip({title,on}: any) { return <View style={[s.chip, on && s.chipOn]}><Text style={on ? s.chipTextOn : s.chipText}>{title}</Text></View>; }
-function Line({l,v}: any) { return <View style={s.line}><Text style={s.sub}>{l}</Text><Text style={s.white}>{v}</Text></View>; }
-function Panel({title,children}: any) { return <View style={s.panel}><Text style={s.pname}>{title}</Text>{children}</View>; }
-function Step({title,active}: any) { return <View style={s.step}><View style={[s.dot, active && {backgroundColor:C.gold, borderColor:C.gold}]}/><Text style={active ? s.white : s.sub}>{title}</Text></View>; }
-function Nav({screen,setScreen}: any) { return <View style={s.nav}><TouchableOpacity onPress={() => setScreen('home')}><Text style={screen === 'home' ? s.navA : s.navT}>🏠{`\n`}Início</Text></TouchableOpacity><TouchableOpacity onPress={() => setScreen('tracking')}><Text style={screen === 'tracking' ? s.navA : s.navT}>📦{`\n`}Pedidos</Text></TouchableOpacity><TouchableOpacity onPress={() => setScreen('profile')}><Text style={screen === 'profile' ? s.navA : s.navT}>👤{`\n`}Perfil</Text></TouchableOpacity></View>; }
-
-const s = StyleSheet.create({
-  bg:{flex:1,backgroundColor:C.bg}, login:{flexGrow:1,justifyContent:'center',padding:24}, logo:{width:96,height:96,borderRadius:48,backgroundColor:C.gold,alignItems:'center',justifyContent:'center',alignSelf:'center',marginBottom:22}, title:{color:C.text,fontSize:32,fontWeight:'900',textAlign:'center',letterSpacing:1}, subCenter:{color:C.gold2,textAlign:'center',fontWeight:'800',marginBottom:18}, sub:{color:C.muted,fontWeight:'700'}, input:{backgroundColor:C.panel2,color:C.text,borderRadius:14,padding:16,marginTop:12,borderWidth:1,borderColor:C.line}, linkBtn:{alignItems:'center',padding:15,marginTop:8}, linkText:{color:C.gold,fontWeight:'900'}, uploadRow:{flexDirection:'row',gap:10,marginTop:14}, uploadBox:{flex:1,height:118,borderRadius:16,backgroundColor:C.panel2,borderWidth:1,borderColor:C.line,alignItems:'center',justifyContent:'center',overflow:'hidden'}, uploadImg:{width:'100%',height:'100%'}, uploadText:{color:C.text,fontWeight:'900',textAlign:'center'}, profileTop:{flexDirection:'row',gap:14,alignItems:'center',marginTop:8}, avatar:{width:76,height:76,borderRadius:38}, avatarFake:{width:76,height:76,borderRadius:38,backgroundColor:C.panel2,alignItems:'center',justifyContent:'center'}, btn:{backgroundColor:C.gold,borderRadius:14,padding:16,alignItems:'center',marginTop:16}, btnText:{color:'#151515',fontWeight:'900'},
-  top:{paddingTop:42,paddingHorizontal:18,paddingBottom:14,backgroundColor:C.bg2,flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderBottomWidth:1,borderBottomColor:C.line}, brand:{color:C.text,fontSize:22,fontWeight:'900'}, location:{color:C.muted,fontWeight:'800',marginTop:5}, delivery:{color:C.gold,fontWeight:'900',marginTop:3}, cartMini:{backgroundColor:C.panel,paddingHorizontal:13,paddingVertical:10,borderRadius:999,borderWidth:1,borderColor:C.line}, cartMiniText:{color:C.gold,fontWeight:'900'},
-  search:{backgroundColor:C.panel2,color:C.text,borderRadius:16,padding:16,borderWidth:1,borderColor:C.line,marginTop:8}, banner:{marginTop:16,backgroundColor:C.panel,borderRadius:26,padding:18,flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderWidth:1,borderColor:C.line}, bannerKicker:{color:C.gold,fontSize:12,fontWeight:'900',letterSpacing:1}, bannerTitle:{color:C.text,fontSize:27,fontWeight:'900',marginTop:6}, bannerSub:{color:C.muted,fontWeight:'800',marginTop:6}, bannerBtn:{backgroundColor:C.gold,borderRadius:12,paddingHorizontal:14,paddingVertical:10,marginTop:14,alignSelf:'flex-start'}, bannerBtnText:{color:'#111',fontWeight:'900'}, section:{color:C.text,fontSize:19,fontWeight:'900',marginTop:22,marginBottom:12},
-  category:{backgroundColor:C.panel,borderRadius:18,padding:14,alignItems:'center',marginRight:10,width:96,borderWidth:1,borderColor:C.line}, catText:{color:C.text,fontWeight:'800',fontSize:12,marginTop:6,textAlign:'center'}, store:{backgroundColor:C.panel,borderRadius:20,padding:16,marginBottom:12,flexDirection:'row',alignItems:'center',gap:14,borderWidth:1,borderColor:C.line}, storeIcon:{width:62,height:62,borderRadius:18,backgroundColor:C.panel2,alignItems:'center',justifyContent:'center'}, pname:{color:C.text,fontSize:17,fontWeight:'900'}, green:{color:C.green,fontWeight:'900',marginTop:4}, arrow:{color:C.muted,fontSize:36},
-  header:{height:68,backgroundColor:C.bg2,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:18,borderBottomWidth:1,borderBottomColor:C.line}, back:{color:C.text,fontSize:38}, htitle:{color:C.text,fontSize:18,fontWeight:'900'}, cover:{height:180,backgroundColor:C.bg2,alignItems:'center',justifyContent:'center',borderBottomWidth:1,borderBottomColor:C.line}, coverBrand:{color:C.gold,fontWeight:'900',letterSpacing:3}, coverSub:{color:C.text,fontWeight:'900'}, storeHead:{padding:16,backgroundColor:C.panel,borderBottomWidth:1,borderBottomColor:C.line}, big:{color:C.text,fontSize:24,fontWeight:'900'}, catRow:{paddingHorizontal:16,paddingVertical:14}, chip:{backgroundColor:C.panel2,borderRadius:999,paddingHorizontal:16,paddingVertical:10,marginRight:8,borderWidth:1,borderColor:C.line}, chipOn:{backgroundColor:C.gold}, chipText:{color:C.text,fontWeight:'900'}, chipTextOn:{color:'#111',fontWeight:'900'},
-  product:{backgroundColor:C.panel,borderRadius:20,padding:16,marginHorizontal:16,marginBottom:12,flexDirection:'row',alignItems:'center',gap:14,borderWidth:1,borderColor:C.line}, prodImg:{width:74,height:74,borderRadius:18,backgroundColor:C.panel2,alignItems:'center',justifyContent:'center'}, price:{color:C.gold,fontWeight:'900',fontSize:18,marginTop:8}, add:{width:50,height:50,borderRadius:25,backgroundColor:C.gold,alignItems:'center',justifyContent:'center'}, addText:{color:'#111',fontSize:28,fontWeight:'900'}, cartBar:{position:'absolute',left:12,right:12,bottom:15,backgroundColor:C.gold,borderRadius:16,padding:16,alignItems:'center'}, cartText:{color:'#111',fontWeight:'900'},
-  cartItem:{backgroundColor:C.panel,borderRadius:18,padding:16,marginBottom:12,flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderWidth:1,borderColor:C.line}, qty:{flexDirection:'row',alignItems:'center',gap:18}, qtyBtn:{color:C.gold,fontWeight:'900',fontSize:28}, white:{color:C.text,fontWeight:'900'}, panel:{backgroundColor:C.panel,borderRadius:20,padding:16,marginTop:10,borderWidth:1,borderColor:C.line}, line:{flexDirection:'row',justifyContent:'space-between',paddingVertical:10,borderBottomWidth:1,borderBottomColor:C.line}, total:{color:C.text,fontSize:25,fontWeight:'900',marginTop:16}, pay:{backgroundColor:C.panel2,borderRadius:14,padding:15,marginTop:10,borderWidth:1,borderColor:C.line}, payOn:{backgroundColor:C.gold}, payTextOn:{color:'#111',fontWeight:'900'},
-  mapBox:{height:260}, track:{backgroundColor:C.panel,borderRadius:20,padding:18,borderWidth:1,borderColor:C.line}, step:{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:12}, dot:{width:18,height:18,borderRadius:9,backgroundColor:C.panel2,borderWidth:1,borderColor:C.line}, menuLine:{backgroundColor:C.panel,borderRadius:16,padding:16,marginBottom:10,flexDirection:'row',justifyContent:'space-between',borderWidth:1,borderColor:C.line}, nav:{position:'absolute',left:0,right:0,bottom:0,height:68,backgroundColor:'rgba(18,20,25,.98)',flexDirection:'row',justifyContent:'space-around',alignItems:'center',borderTopWidth:1,borderTopColor:C.line}, navT:{color:C.muted,textAlign:'center',fontSize:12,fontWeight:'800'}, navA:{color:C.gold,textAlign:'center',fontSize:12,fontWeight:'900'}, empty:{margin:16,backgroundColor:C.panel,borderRadius:18,padding:20,borderWidth:1,borderColor:C.line,alignItems:'center'}, code:{color:C.gold,fontSize:31,fontWeight:'900',letterSpacing:4,marginTop:8}, contactRow:{flexDirection:'row',gap:8,marginTop:16}, small:{flex:1,backgroundColor:C.gold,borderRadius:12,padding:12,alignItems:'center'}, smallDark:{flex:1,backgroundColor:C.panel2,borderRadius:12,padding:12,alignItems:'center',borderWidth:1,borderColor:C.line}, smallText:{color:'#111',fontWeight:'900'}, pageBox:{margin:16,backgroundColor:C.panel,borderRadius:20,padding:18,borderWidth:1,borderColor:C.line}
-});
+export default function App(){
+  const [screen,setScreen]=useState<Screen>('login');
+  const [name,setName]=useState(''); const [cpf,setCpf]=useState(''); const [phone,setPhone]=useState(''); const [password,setPassword]=useState(''); const [photo,setPhoto]=useState(''); const [documentPhoto,setDocumentPhoto]=useState('');
+  const [stores,setStores]=useState<Store[]>([]); const [store,setStore]=useState<Store|null>(null); const [products,setProducts]=useState<Product[]>([]); const [cart,setCart]=useState<any[]>([]); const [query,setQuery]=useState(''); const [loading,setLoading]=useState(false);
+  useEffect(()=>{ boot(); },[]);
+  async function boot(){ const saved=await AsyncStorage.getItem('clientUser'); const logged=await AsyncStorage.getItem('clientLoggedIn'); if(saved&&logged==='yes'){const u=JSON.parse(saved); setName(u.name||''); setCpf(u.cpf||''); setPhone(u.phone||''); setPhoto(u.photo||''); setDocumentPhoto(u.documentPhoto||''); setScreen('home');} await loadStores(); }
+  async function loadStores(){ setLoading(true); const d=await apiGet(['/stores','/store','/adegas','/shops']); const arr=Array.isArray(d)?d:(d?.stores||d?.data||d?.adegas||[]); setStores(Array.isArray(arr)&&arr.length?arr:demoStores); setLoading(false); }
+  async function login(){ if(!cpf||!password) return Alert.alert('Atenção','Digite CPF e senha.'); const remote=await apiPost(['/customers/login','/clients/login','/login/client'],{cpf:digits(cpf),password}); let u=remote?.user||remote?.client||remote?.customer; if(!u){ const saved=await AsyncStorage.getItem('clientUser'); if(saved){const local=JSON.parse(saved); if(digits(local.cpf)===digits(cpf)&&local.password===password) u=local; }} if(!u) return Alert.alert('Login inválido','CPF ou senha incorretos.'); setName(u.name||u.nome||''); setPhone(u.phone||u.telefone||''); setPhoto(u.photo||''); setDocumentPhoto(u.documentPhoto||''); await AsyncStorage.setItem('clientUser',JSON.stringify({...u,cpf,password})); await AsyncStorage.setItem('clientLoggedIn','yes'); setScreen('home'); loadStores(); }
+  async function register(){ if(!name||!cpf||!phone||!password) return Alert.alert('Atenção','Preencha nome, CPF, telefone e senha.'); const body={name,nome:name,cpf:digits(cpf),phone,telefone:phone,password,senha:password,photo,documentPhoto,document_photo:documentPhoto}; const remote=await apiPost(['/customers/register','/clients/register','/customers','/clients'],body); const user=remote?.user||remote?.client||remote?.customer||body; await AsyncStorage.setItem('clientUser',JSON.stringify(user)); await AsyncStorage.setItem('clientLoggedIn','yes'); setScreen('home'); }
+  async function pick(kind:'photo'|'doc'){ const perm=await ImagePicker.requestMediaLibraryPermissionsAsync(); if(!perm.granted) return Alert.alert('Permissão','Permita acesso às fotos.'); const r=await ImagePicker.launchImageLibraryAsync({mediaTypes:ImagePicker.MediaTypeOptions.Images,quality:.75}); if(!r.canceled&&r.assets?.[0]?.uri){ kind==='photo'?setPhoto(r.assets[0].uri):setDocumentPhoto(r.assets[0].uri); }}
+  async function openStore(s:Store){ setStore(s); setProducts([]); setScreen('store'); const d=await apiGet([`/stores/${s.id}/products`,`/products?store_id=${s.id}`,`/products/store/${s.id}`]); const arr=Array.isArray(d)?d:(d?.products||d?.data||[]); setProducts(Array.isArray(arr)&&arr.length?arr:demoProducts.filter(p=>!p.store_id||String(p.store_id)===String(s.id))); }
+  function add(p:Product){ setCart(c=>{const i=c.findIndex(x=>String(x.id)===String(p.id)); if(i>=0){const n=[...c]; n[i].qty++; return n;} return [...c,{...p,qty:1}];}); }
+  const total=useMemo(()=>cart.reduce((s,p)=>s+Number(p.price||p.preco||0)*p.qty,0),[cart]);
+  async function finish(){ if(!store||!cart.length) return; const body={storeId:store.id,store_id:store.id,customerName:name,customerPhone:phone,customerCpf:cpf,items:cart,total,total_amount:total,status:'pending'}; const r=await apiPost(['/orders','/pedidos'],body); Alert.alert('Pedido enviado', r?'Seu pedido foi enviado para a adega.':'Pedido salvo no app. Verifique a API.'); setCart([]); setScreen('home'); }
+  async function logout(){await AsyncStorage.removeItem('clientLoggedIn'); setScreen('login');}
+  if(screen==='login') return <SafeAreaView style={s.safe}><StatusBar barStyle="light-content"/><View style={s.center}><Text style={s.logo}>🍺</Text><Text style={s.title}>CHAMA ADEGA</Text><TextInput style={s.input} placeholder="CPF" placeholderTextColor={C.muted} value={cpf} onChangeText={setCpf} keyboardType="number-pad"/><TextInput style={s.input} placeholder="Senha" placeholderTextColor={C.muted} value={password} onChangeText={setPassword} secureTextEntry/><TouchableOpacity style={s.btn} onPress={login}><Text style={s.btnT}>ENTRAR</Text></TouchableOpacity><TouchableOpacity onPress={()=>setScreen('register')}><Text style={s.link}>Criar cadastro do cliente</Text></TouchableOpacity></View></SafeAreaView>;
+  if(screen==='register') return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.pad}><Text style={s.h1}>Cadastro do cliente</Text><TextInput style={s.input} placeholder="Nome completo" placeholderTextColor={C.muted} value={name} onChangeText={setName}/><TextInput style={s.input} placeholder="CPF" placeholderTextColor={C.muted} value={cpf} onChangeText={setCpf} keyboardType="number-pad"/><TextInput style={s.input} placeholder="Telefone/WhatsApp" placeholderTextColor={C.muted} value={phone} onChangeText={setPhone} keyboardType="phone-pad"/><TextInput style={s.input} placeholder="Senha" placeholderTextColor={C.muted} value={password} onChangeText={setPassword} secureTextEntry/><TouchableOpacity style={s.pick} onPress={()=>pick('photo')}><Text style={s.text}>📷 Foto do cliente {photo?'✅':''}</Text></TouchableOpacity><TouchableOpacity style={s.pick} onPress={()=>pick('doc')}><Text style={s.text}>🪪 Foto do documento {documentPhoto?'✅':''}</Text></TouchableOpacity><TouchableOpacity style={s.btn} onPress={register}><Text style={s.btnT}>CADASTRAR</Text></TouchableOpacity><TouchableOpacity onPress={()=>setScreen('login')}><Text style={s.link}>Voltar para login</Text></TouchableOpacity></ScrollView></SafeAreaView>;
+  if(screen==='store') return <SafeAreaView style={s.safe}><View style={s.top}><TouchableOpacity onPress={()=>setScreen('home')}><Text style={s.back}>‹</Text></TouchableOpacity><Text style={s.hTitle}>{storeName(store!)}</Text><TouchableOpacity onPress={()=>setScreen('cart')}><Text style={s.cart}>🛒 {cart.length}</Text></TouchableOpacity></View><ScrollView contentContainerStyle={s.pad}>{products.map(p=><View key={String(p.id)} style={s.card}><Text style={s.picon}>🍾</Text><View style={{flex:1}}><Text style={s.cardTitle}>{prodName(p)}</Text><Text style={s.muted}>{p.category||'Bebidas'}</Text><Text style={s.price}>{money(p.price||p.preco)}</Text></View><TouchableOpacity style={s.add} onPress={()=>add(p)}><Text style={s.addT}>+</Text></TouchableOpacity></View>)}</ScrollView></SafeAreaView>;
+  if(screen==='cart') return <SafeAreaView style={s.safe}><View style={s.top}><TouchableOpacity onPress={()=>setScreen(store?'store':'home')}><Text style={s.back}>‹</Text></TouchableOpacity><Text style={s.hTitle}>Carrinho</Text><View/></View><ScrollView contentContainerStyle={s.pad}>{cart.map(p=><View key={String(p.id)} style={s.card}><Text style={s.cardTitle}>{prodName(p)} x{p.qty}</Text><Text style={s.price}>{money(Number(p.price||p.preco||0)*p.qty)}</Text></View>)}<Text style={s.total}>Total: {money(total)}</Text><TouchableOpacity style={s.btn} onPress={finish}><Text style={s.btnT}>FINALIZAR PEDIDO</Text></TouchableOpacity></ScrollView></SafeAreaView>;
+  if(screen==='profile') return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.pad}><Text style={s.h1}>Meu perfil</Text>{photo?<Image source={{uri:photo}} style={s.avatar}/>:null}<Text style={s.text}>Nome: {name}</Text><Text style={s.text}>CPF: {cpf}</Text><Text style={s.text}>Telefone: {phone}</Text><Text style={s.text}>Documento: {documentPhoto?'Enviado':'Não enviado'}</Text><TouchableOpacity style={s.pick} onPress={()=>setScreen('home')}><Text style={s.text}>Voltar</Text></TouchableOpacity><TouchableOpacity style={s.out} onPress={logout}><Text style={s.outT}>Sair</Text></TouchableOpacity></ScrollView></SafeAreaView>;
+  return <SafeAreaView style={s.safe}><View style={s.hero}><View><Text style={s.kicker}>ADEGAS PERTO DE VOCÊ</Text><Text style={s.hello}>Olá, {name||'cliente'}</Text><Text style={s.muted}>🟢 Aberto agora • Entrega rápida</Text></View><TouchableOpacity onPress={()=>setScreen('profile')}><Text style={s.profile}>👤</Text></TouchableOpacity></View><View style={s.pad2}><TextInput style={s.input} placeholder="Buscar adega..." placeholderTextColor={C.muted} value={query} onChangeText={setQuery}/><TouchableOpacity style={s.reload} onPress={loadStores}><Text style={s.text}>{loading?'Carregando...':'Atualizar adegas da API'}</Text></TouchableOpacity></View><ScrollView contentContainerStyle={s.pad}>{stores.filter(x=>!query||storeName(x).toLowerCase().includes(query.toLowerCase())).map(st=><TouchableOpacity key={String(st.id)} style={s.store} onPress={()=>openStore(st)}><Text style={s.picon}>🍺</Text><View style={{flex:1}}><Text style={s.cardTitle}>{storeName(st)}</Text><Text style={s.muted}>{st.address||'Entrega disponível'}</Text></View><Text style={s.go}>›</Text></TouchableOpacity>)}</ScrollView></SafeAreaView>;
+}
+const s=StyleSheet.create({safe:{flex:1,backgroundColor:C.bg},center:{flex:1,justifyContent:'center',padding:24},pad:{padding:16,paddingBottom:40},pad2:{paddingHorizontal:16},logo:{fontSize:64,textAlign:'center'},title:{color:C.text,fontSize:32,fontWeight:'900',textAlign:'center',marginBottom:20},h1:{color:C.text,fontSize:26,fontWeight:'900',marginBottom:12},input:{backgroundColor:C.card,borderColor:C.line,borderWidth:1,borderRadius:16,padding:15,color:C.text,fontWeight:'700',marginTop:10},btn:{backgroundColor:C.gold,borderRadius:16,padding:17,alignItems:'center',marginTop:14},btnT:{color:'#111',fontWeight:'900'},link:{color:C.gold,textAlign:'center',fontWeight:'900',marginTop:18},pick:{backgroundColor:C.card2,borderRadius:16,padding:16,marginTop:12,borderWidth:1,borderColor:C.line},text:{color:C.text,fontWeight:'800'},muted:{color:C.muted,fontWeight:'700',marginTop:4},top:{height:64,backgroundColor:C.bg,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:16},back:{color:C.text,fontSize:42},hTitle:{color:C.text,fontSize:18,fontWeight:'900'},cart:{color:C.gold,fontWeight:'900',fontSize:17},card:{backgroundColor:C.card,borderRadius:22,padding:16,marginBottom:12,borderWidth:1,borderColor:C.line,flexDirection:'row',alignItems:'center',gap:12},picon:{fontSize:36},cardTitle:{color:C.text,fontSize:18,fontWeight:'900'},price:{color:C.gold,fontSize:18,fontWeight:'900',marginTop:6},add:{width:44,height:44,borderRadius:14,backgroundColor:C.gold,alignItems:'center',justifyContent:'center'},addT:{color:'#111',fontSize:26,fontWeight:'900'},total:{color:C.text,fontSize:26,fontWeight:'900',textAlign:'right',marginVertical:16},hero:{margin:16,marginTop:36,backgroundColor:'#111827',borderRadius:26,padding:18,flexDirection:'row',justifyContent:'space-between',alignItems:'center'},kicker:{color:C.gold,fontSize:12,fontWeight:'900'},hello:{color:C.text,fontSize:25,fontWeight:'900',marginTop:4},profile:{fontSize:34},reload:{backgroundColor:C.card2,borderRadius:14,padding:13,alignItems:'center',marginTop:10,borderWidth:1,borderColor:C.line},store:{backgroundColor:C.card,borderRadius:24,padding:17,marginBottom:13,borderWidth:1,borderColor:C.line,flexDirection:'row',alignItems:'center',gap:12},go:{color:C.gold,fontSize:34,fontWeight:'900'},avatar:{width:96,height:96,borderRadius:48,alignSelf:'center',marginBottom:14},out:{borderColor:C.red,borderWidth:1,borderRadius:16,padding:16,alignItems:'center',marginTop:16},outT:{color:C.red,fontWeight:'900'}});

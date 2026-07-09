@@ -1,6 +1,6 @@
 {
-  "name": "chama-cliente-v34-login-cadastro",
-  "version": "3.4.0",
+  "name": "chama-cliente-v36-api-integrado",
+  "version": "3.6.0",
   "main": "node_modules/expo/AppEntry.js",
   "private": true,
   "scripts": {
