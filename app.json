@@ -1,26 +1,22 @@
 {
   "expo": {
-    "name": "Chama Bebidas",
-    "slug": "chama-cliente-v31",
-    "version": "3.1.0",
+    "name": "Chama Cliente Premium",
+    "slug": "chama-cliente-premium",
+    "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./icon.png",
-    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
     "splash": {
-      "image": "./splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#08090C"
+      "backgroundColor": "#16A34A",
+      "resizeMode": "contain"
     },
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true },
     "android": {
-      "package": "com.chamabebidas.cliente",
-      "versionCode": 4,
       "adaptiveIcon": {
-        "foregroundImage": "./adaptive-icon.png",
-        "backgroundColor": "#08090C"
+        "backgroundColor": "#16A34A"
       },
-      "permissions": [
-        "INTERNET"
-      ]
+      "package": "com.chamabebidas.clientepremium"
     }
   }
 }

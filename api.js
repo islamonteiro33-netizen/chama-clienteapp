@@ -1,0 +1,5 @@
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { colors } from '../theme/colors';
+export default function OrdersScreen(){const steps=['Pedido recebido','Em preparo','Saiu para entrega','Entregue'];return <View style={s.wrap}><Text style={s.title}>Acompanhar pedido</Text><View style={s.map}><Text style={s.mapText}>🗺️ Mapa do entregador</Text></View><View style={s.card}>{steps.map((st,i)=><View key={st} style={s.step}><View style={[s.dot,{backgroundColor:i<3?colors.primary:colors.border}]}/><Text style={s.stepText}>{st}</Text></View>)}</View></View>}
+const s=StyleSheet.create({wrap:{flex:1,backgroundColor:colors.bg,padding:20,paddingTop:60},title:{fontSize:28,fontWeight:'900'},map:{height:220,borderRadius:26,backgroundColor:'#D1FAE5',alignItems:'center',justifyContent:'center',marginTop:20},mapText:{fontSize:20,fontWeight:'900',color:colors.primaryDark},card:{backgroundColor:colors.white,borderRadius:24,padding:20,marginTop:18},step:{flexDirection:'row',alignItems:'center',marginBottom:18},dot:{width:18,height:18,borderRadius:9,marginRight:14},stepText:{fontSize:16,fontWeight:'800'}})
