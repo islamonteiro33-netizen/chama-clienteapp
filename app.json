@@ -1,26 +1,25 @@
 {
   "expo": {
-    "name": "Chama Adega",
-    "slug": "chama-adega-v91-menu",
-    "version": "9.1.0",
+    "name": "Chama Bebidas",
+    "slug": "chama-cliente-v31",
+    "version": "3.1.0",
     "orientation": "portrait",
     "icon": "./icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#08090C"
     },
     "android": {
-      "package": "com.chamabebidas.adega",
-      "versionCode": 12,
+      "package": "com.chamabebidas.cliente",
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#08090C"
       },
       "permissions": [
-        "INTERNET",
-        "VIBRATE"
+        "INTERNET"
       ]
     }
   }
